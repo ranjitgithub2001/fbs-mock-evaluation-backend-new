@@ -16,13 +16,13 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/ai")
+@RequestMapping("/api/ai")
 public class AiController {
 
     private static final String GROQ_API_URL =
             "https://api.groq.com/openai/v1/chat/completions";
 
-    @Value("${groq.api.key}")
+    @Value("${groq.api.key:}")
     private String apiKey;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -31,11 +31,16 @@ public class AiController {
     public ResponseEntity<String> generate(@RequestBody Map<String, Object> request) {
         System.out.println("AI endpoint hit successfully");
 
+        if (apiKey == null || apiKey.isBlank()) {
+            return ResponseEntity.status(503)
+                    .body("{\"error\":\"AI is not configured on this server\"}");
+        }
+
         try {
             String promptText = extractPrompt(request);
 
             String requestBody = objectMapper.writeValueAsString(Map.of(
-                "model", "llama-3.3-70b-versatile",
+                "model", "openai/gpt-oss-20b",
                 "messages", List.of(
                     Map.of("role", "user", "content", promptText)
                 ),
@@ -59,13 +64,17 @@ public class AiController {
             );
 
             System.out.println("Groq status: " + response.statusCode());
-            return ResponseEntity.ok(response.body());
+            return fromGroqResponse(response.statusCode(), response.body());
 
         } catch (Exception e) {
             System.out.println("AI error: " + e.getMessage());
             return ResponseEntity.status(500)
                     .body("{\"error\":\"" + e.getMessage() + "\"}");
         }
+    }
+
+    static ResponseEntity<String> fromGroqResponse(int statusCode, String body) {
+        return ResponseEntity.status(statusCode).body(body);
     }
 
     @SuppressWarnings("unchecked")

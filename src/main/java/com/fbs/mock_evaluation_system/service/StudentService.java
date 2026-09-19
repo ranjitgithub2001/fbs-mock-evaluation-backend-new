@@ -50,26 +50,22 @@ public class StudentService {
 
         String frnMiddleBlock = FrnParser.extractMiddleBlock(normalizedFrn);
         if (!frnMiddleBlock.equals(batch.getFrnBatchCode())) {
-            throw new InvalidInputException(
-                    "FRN does not belong to the selected batch");
+            throw new InvalidInputException("FRN does not belong to the selected batch");
         }
 
         String rollNumber = FrnParser.extractRollNumber(normalizedFrn);
 
-        Student student = StudentMapper.toEntity(
-                normalizedFrn, normalizedName, rollNumber, batch);
+        Student student = StudentMapper.toEntity(normalizedFrn, normalizedName, rollNumber, batch);
 
         try {
             return StudentMapper.toDTO(studentRepository.save(student));
         } catch (DataIntegrityViolationException ex) {
-            throw new InvalidInputException(
-                    "Student with this FRN already exists");
+            throw new InvalidInputException("Student with this FRN already exists");
         }
     }
 
     @Transactional
-    public List<StudentResponseDTO> createStudentsBulk(
-            List<StudentRequestDTO> requests) {
+    public List<StudentResponseDTO> createStudentsBulk(List<StudentRequestDTO> requests) {
 
         if (requests == null || requests.isEmpty()) {
             throw new InvalidInputException("Student list cannot be empty");
@@ -91,73 +87,55 @@ public class StudentService {
         List<Student> studentsToSave = new ArrayList<>();
 
         for (StudentRequestDTO request : requests) {
-
             String normalizedFrn = request.getFrn().trim().toUpperCase();
             String normalizedName = request.getName().trim();
             Batch batch = batchMap.get(request.getBatchId());
 
             if (batch == null) {
-                throw new BatchNotFoundException(
-                        "Batch not found with id: " + request.getBatchId());
+                throw new BatchNotFoundException("Batch not found with id: " + request.getBatchId());
             }
 
             String frnMiddleBlock = FrnParser.extractMiddleBlock(normalizedFrn);
             if (!frnMiddleBlock.equals(batch.getFrnBatchCode())) {
                 throw new InvalidInputException(
-                        "FRN does not belong to the selected batch: "
-                        + normalizedFrn);
+                        "FRN does not belong to the selected batch: " + normalizedFrn);
             }
 
             String rollNumber = FrnParser.extractRollNumber(normalizedFrn);
-            studentsToSave.add(StudentMapper.toEntity(
-                    normalizedFrn, normalizedName, rollNumber, batch));
+            studentsToSave.add(StudentMapper.toEntity(normalizedFrn, normalizedName, rollNumber, batch));
         }
 
         try {
-            List<Student> savedStudents =
-                    studentRepository.saveAll(studentsToSave);
+            List<Student> savedStudents = studentRepository.saveAll(studentsToSave);
             List<StudentResponseDTO> response = new ArrayList<>();
             for (Student student : savedStudents) {
                 response.add(StudentMapper.toDTO(student));
             }
             return response;
         } catch (DataIntegrityViolationException ex) {
-            throw new InvalidInputException(
-                    "Duplicate FRN or roll number detected");
+            throw new InvalidInputException("Duplicate FRN or roll number detected");
         }
     }
 
     @Transactional(readOnly = true)
     public PageResponseDTO<StudentResponseDTO> getStudents(
-            int page, int size, Long batchId,
-            String sortBy, String direction) {
+            int page, int size, Long batchId, String sortBy, String direction) {
 
-        if (page < 0) {
-            throw new InvalidInputException(
-                    "Page number must be zero or positive");
-        }
-        if (size <= 0) {
-            throw new InvalidInputException(
-                    "Page size must be greater than zero");
-        }
-        if (size > 50) {
-            size = 50;
-        }
+        if (page < 0) throw new InvalidInputException("Page number must be zero or positive");
+        if (size <= 0) throw new InvalidInputException("Page size must be greater than zero");
+        if (size > 50) size = 50;
 
         Sort sort = Sort.unsorted();
         if (sortBy != null) {
-            if (!sortBy.equals("name") && !sortBy.equals("frn")
-                    && !sortBy.equals("rollNumber")) {
-                throw new InvalidInputException(
-                        "Invalid sort field: " + sortBy);
+            if (!sortBy.equals("name") && !sortBy.equals("frn") && !sortBy.equals("rollNumber")) {
+                throw new InvalidInputException("Invalid sort field: " + sortBy);
             }
             if (direction == null || direction.equalsIgnoreCase("asc")) {
                 sort = Sort.by(sortBy).ascending();
             } else if (direction.equalsIgnoreCase("desc")) {
                 sort = Sort.by(sortBy).descending();
             } else {
-                throw new InvalidInputException(
-                        "Direction must be 'asc' or 'desc'");
+                throw new InvalidInputException("Direction must be 'asc' or 'desc'");
             }
         }
 
@@ -165,13 +143,13 @@ public class StudentService {
         Page<Student> studentPage;
 
         if (batchId != null) {
-            Batch batch = batchRepository.findById(batchId)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Batch not found with id: " + batchId));
-            studentPage = studentRepository.findByBatchId(
-                    batch.getId(), pageable);
+            batchRepository.findById(batchId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Batch not found with id: " + batchId));
+            // Only show active students
+            studentPage = studentRepository.findByBatchIdAndActiveTrue(batchId, pageable);
         } else {
-            studentPage = studentRepository.findAll(pageable);
+            // Only show active students
+            studentPage = studentRepository.findByActiveTrue(pageable);
         }
 
         List<StudentResponseDTO> response = new ArrayList<>();
@@ -190,54 +168,35 @@ public class StudentService {
 
     @Transactional(readOnly = true)
     public StudentResponseDTO getStudentById(Long id) {
-
         Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Student not found with id: " + id));
-
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + id));
         return StudentMapper.toDTO(student);
     }
 
     @Transactional(readOnly = true)
     public StudentResponseDTO getStudentByFrn(String frn) {
-
         if (frn == null || frn.trim().isEmpty()) {
             throw new InvalidInputException("FRN cannot be empty");
         }
-
-        Student student = studentRepository.findByFrn(frn.trim().toUpperCase())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Student not found with FRN: " + frn));
-
+        Student student = studentRepository.findByFrnAndActiveTrue(frn.trim().toUpperCase())
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found with FRN: " + frn));
         return StudentMapper.toDTO(student);
     }
 
     // Only name is updatable — FRN and batch are immutable identity fields
     @Transactional
-    public StudentResponseDTO updateStudent(Long id,
-            StudentRequestDTO request) {
-
+    public StudentResponseDTO updateStudent(Long id, StudentRequestDTO request) {
         Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Student not found with id: " + id));
-
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + id));
         student.setName(request.getName().trim());
-
         return StudentMapper.toDTO(studentRepository.save(student));
     }
 
+    // ── Deletion blocked — students are managed by Student Management System ──
     @Transactional
     public void deleteStudent(Long id) {
-
-        Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Student not found with id: " + id));
-
-        try {
-            studentRepository.delete(student);
-        } catch (DataIntegrityViolationException ex) {
-            throw new InvalidInputException(
-                    "Student cannot be deleted as they have evaluations linked");
-        }
+        throw new InvalidInputException(
+            "Students cannot be deleted from the Mock Evaluation System. " +
+            "Please manage students through the FBS Student Management System.");
     }
 }

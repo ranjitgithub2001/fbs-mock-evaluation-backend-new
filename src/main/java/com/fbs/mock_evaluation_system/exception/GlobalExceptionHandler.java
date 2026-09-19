@@ -71,6 +71,18 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException ex) {
+        return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(new ErrorResponse(
+                        LocalDateTime.now(),
+                        HttpStatus.TOO_MANY_REQUESTS.value(),
+                        HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase(),
+                        ex.getMessage()
+                ));
+    }
+
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateResourceException(
             DuplicateResourceException ex) {

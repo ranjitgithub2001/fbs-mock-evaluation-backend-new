@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -31,6 +32,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain)
             throws ServletException, IOException {
+    	if (isPublicUnauthenticatedPath(request)) {
+    	    filterChain.doFilter(request, response);
+    	    return;
+    	}
 
         // 1 — Extract Authorization header
         String authHeader = request.getHeader("Authorization");
@@ -56,24 +61,53 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         // 6 — Only set auth if not already authenticated
         if (email != null &&
                 SecurityContextHolder.getContext().getAuthentication() == null) {
+            try {
+                UserDetails userDetails =
+                        userDetailsService.loadUserByUsername(email);
 
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(email);
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
 
-            UsernamePasswordAuthenticationToken authToken =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
+                authToken.setDetails(
+                        new WebAuthenticationDetailsSource()
+                                .buildDetails(request));
 
-            authToken.setDetails(
-                    new WebAuthenticationDetailsSource()
-                            .buildDetails(request));
-
-            SecurityContextHolder.getContext().setAuthentication(authToken);
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            } catch (UsernameNotFoundException ignored) {
+                // Stale JWT for a deleted user: continue unauthenticated.
+            }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    static boolean isPublicUnauthenticatedPath(HttpServletRequest request) {
+        String path = servletPath(request);
+        if (path.startsWith("/api/auth") || path.startsWith("/auth")) {
+            return true;
+        }
+        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        return path.equals("/api/trainer-requests")
+                || path.equals("/api/trainer-requests/")
+                || path.equals("/trainer-requests")
+                || path.equals("/trainer-requests/");
+    }
+
+    private static String servletPath(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        if (path == null || path.isBlank()) {
+            return "";
+        }
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isEmpty() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
+        return path;
     }
 }

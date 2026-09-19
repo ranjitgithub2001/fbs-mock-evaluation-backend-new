@@ -20,7 +20,7 @@ import com.fbs.mock_evaluation_system.service.BatchService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/batches")
+@RequestMapping("/api/batches")
 public class BatchController {
 
     private final BatchService batchService;

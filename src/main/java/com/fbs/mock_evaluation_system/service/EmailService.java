@@ -14,29 +14,27 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.mail.from}")
+    @Value("${app.mail.from:${spring.mail.username}}")
     private String fromEmail;
 
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
 
-    public void sendApprovalEmail(String toEmail, String fullName,
-            String password) {
+    public void sendPasswordSetupEmail(String toEmail, String fullName, String otp) {
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(toEmail);
-        message.setSubject("FirstBit Solutions — Your Trainer Account is Approved");
+        message.setSubject("FirstBit Solutions — Set your account password");
         message.setText(
             "Dear " + fullName + ",\n\n" +
-            "Your request to join FirstBit Solutions Mock Evaluation System " +
-            "has been approved.\n\n" +
-            "Your login credentials are:\n" +
-            "Email:    " + toEmail + "\n" +
-            "Password: " + password + "\n\n" +
-            "Please log in and change your password after your first login.\n\n" +
-            "Portal: https://fbs-mock-evaluation-frontend-rmb4.vercel.app\n\n" +
+            "Your account for the FirstBit Solutions Mock Evaluation System is ready.\n\n" +
+            "Set your password with this one-time code:\n\n" +
+            "    " + otp + "\n\n" +
+            "This code is valid for 10 minutes.\n\n" +
+            "Open: https://shubhamwagh.co.in/verify-otp?email=" + toEmail + "\n\n" +
+            "If you did not expect this email, ignore it.\n\n" +
             "Regards,\n" +
             "FirstBit Solutions Admin Team"
         );
@@ -149,4 +147,6 @@ public class EmailService {
 
         mailSender.send(message);
     }
+    
+     
 }

@@ -20,7 +20,7 @@ import com.fbs.mock_evaluation_system.service.CourseModuleService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/modules")
+@RequestMapping("/api/modules")
 public class CourseModuleController {
 
     private final CourseModuleService moduleService;

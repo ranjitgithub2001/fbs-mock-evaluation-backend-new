@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/analytics")
+@RequestMapping("/api/analytics")
 public class AnalyticsController {
 
     private final AnalyticsService analyticsService;

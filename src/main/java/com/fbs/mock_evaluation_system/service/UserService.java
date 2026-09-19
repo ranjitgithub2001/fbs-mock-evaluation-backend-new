@@ -1,5 +1,18 @@
 package com.fbs.mock_evaluation_system.service;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import com.fbs.mock_evaluation_system.dto.ChangePasswordRequestDTO;
 import com.fbs.mock_evaluation_system.dto.PageResponseDTO;
 import com.fbs.mock_evaluation_system.dto.UserFilterDTO;
@@ -11,60 +24,61 @@ import com.fbs.mock_evaluation_system.exception.InvalidInputException;
 import com.fbs.mock_evaluation_system.exception.ResourceNotFoundException;
 import com.fbs.mock_evaluation_system.mapper.UserMapper;
 import com.fbs.mock_evaluation_system.repository.UserRepository;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.ArrayList;
-import java.util.List;
+import com.fbs.mock_evaluation_system.security.SecurePasswords;
 
 @Service
 public class UserService {
 
-    private static final String DEFAULT_PASSWORD = "Welcome@123";
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final OtpService otpService;
+    private final TransactionTemplate transactionTemplate;
 
     public UserService(UserRepository userRepository,
             UserMapper userMapper,
             PasswordEncoder passwordEncoder,
-            EmailService emailService) {
+            EmailService emailService,
+            OtpService otpService,
+            PlatformTransactionManager transactionManager) {
         this.userRepository = userRepository;
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
+        this.otpService = otpService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
     public UserResponseDTO createUser(UserRequestDTO request) {
 
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         String normalizedName = request.getFullName().trim();
 
-        if (userRepository.existsByEmail(normalizedEmail)) {
-            throw new DuplicateResourceException(
-                    "User already exists with email: " + normalizedEmail);
+        User saved = transactionTemplate.execute(status -> {
+            if (userRepository.existsByEmail(normalizedEmail)) {
+                throw new DuplicateResourceException(
+                        "User already exists with email: " + normalizedEmail);
+            }
+
+            User user = new User();
+            user.setFullName(normalizedName);
+            user.setEmail(normalizedEmail);
+            user.setRole(request.getRole());
+            user.setActive(true);
+            user.setPassword(passwordEncoder.encode(SecurePasswords.randomUnusableSecret()));
+
+            return userRepository.save(user);
+        });
+
+        try {
+            String setupOtp = otpService.generateOtp(saved.getEmail());
+            emailService.sendPasswordSetupEmail(saved.getEmail(), saved.getFullName(), setupOtp);
+        } catch (Exception e) {
+            log.error("Failed to send password setup email after creating user {}", saved.getEmail(), e);
         }
-
-        User user = new User();
-        user.setFullName(normalizedName);
-        user.setEmail(normalizedEmail);
-        user.setRole(request.getRole());
-        user.setActive(true);
-        user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
-
-        User saved = userRepository.save(user);
-        emailService.sendApprovalEmail(
-        	    saved.getEmail(),
-        	    saved.getFullName(),
-        	    DEFAULT_PASSWORD
-        	);
 
         return userMapper.toResponseDTO(saved);
     }

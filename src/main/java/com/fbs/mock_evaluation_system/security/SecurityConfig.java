@@ -14,7 +14,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
+
+import jakarta.servlet.DispatcherType;
 
 @Configuration
 @EnableWebSecurity
@@ -23,7 +26,8 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final UserDetailsServiceImpl userDetailsService;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter, UserDetailsServiceImpl userDetailsService) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter,
+            UserDetailsServiceImpl userDetailsService) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
     }
@@ -34,10 +38,11 @@ public class SecurityConfig {
         http.cors(cors -> cors.configurationSource(request -> {
             CorsConfiguration config = new CorsConfiguration();
             config.addAllowedOrigin("http://localhost:3000");
-            config.addAllowedOrigin("https://fbs-mock-evaluation-frontend-rmb4.vercel.app");
+            config.addAllowedOrigin("https://shubhamwagh.co.in");
             config.addAllowedMethod("GET");
             config.addAllowedMethod("POST");
             config.addAllowedMethod("PUT");
+            config.addAllowedMethod("PATCH");
             config.addAllowedMethod("DELETE");
             config.addAllowedMethod("OPTIONS");
             config.addAllowedHeader("*");
@@ -47,29 +52,38 @@ public class SecurityConfig {
         .csrf(csrf -> csrf.disable())
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
+            .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.FORWARD).permitAll()
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-            .requestMatchers("/auth/**").permitAll()
             .requestMatchers("/api/auth/**").permitAll()
-            .requestMatchers("/trainer-requests/**").permitAll()
-            .requestMatchers("/api/trainer-requests/**").permitAll()
-            .requestMatchers(HttpMethod.POST, "/ai/**").hasAnyRole("ADMIN", "TRAINER")
-            .requestMatchers(HttpMethod.POST, "/reports/**").hasAnyRole("ADMIN", "TRAINER")
-            .requestMatchers("/trainer-requests/**").hasRole("ADMIN")
-            .requestMatchers("/users/**").hasRole("ADMIN")
+            .requestMatchers(new RegexRequestMatcher("^/api/trainer-requests/?$", "POST")).permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/trainer-requests", "/api/trainer-requests/").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/trainer-requests", "/api/trainer-requests/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.POST, "/api/trainer-requests/*/approve", "/api/trainer-requests/*/reject").hasRole("ADMIN")
+            .requestMatchers("/api/trainer-requests/**").hasRole("ADMIN")
+
+            // ADMIN only
+            .requestMatchers("/api/users/**").hasRole("ADMIN")
             .requestMatchers(HttpMethod.DELETE, "/**").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.GET, "/students/**").hasAnyRole("ADMIN", "TRAINER")
-            .requestMatchers(HttpMethod.GET, "/batches/**").hasAnyRole("ADMIN", "TRAINER")
-            .requestMatchers(HttpMethod.GET, "/modules/**").hasAnyRole("ADMIN", "TRAINER")
-            .requestMatchers(HttpMethod.GET, "/course-modules/**").hasAnyRole("ADMIN", "TRAINER")
-            .requestMatchers(HttpMethod.GET, "/batch-modules/**").hasAnyRole("ADMIN", "TRAINER")
-            .requestMatchers(HttpMethod.GET, "/evaluations/**").hasAnyRole("ADMIN", "TRAINER")
-            .requestMatchers(HttpMethod.POST, "/evaluations").hasAnyRole("ADMIN", "TRAINER")
-            .requestMatchers(HttpMethod.PUT, "/evaluations/**").hasAnyRole("ADMIN", "TRAINER")
-            .requestMatchers(HttpMethod.POST, "/batches/**").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.POST, "/students/**").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.POST, "/modules/**").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.POST, "/batch-modules/**").hasRole("ADMIN")
-            .requestMatchers(HttpMethod.GET, "/analytics/**").hasAnyRole("ADMIN", "TRAINER")
+            .requestMatchers(HttpMethod.POST, "/api/batches/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.POST, "/api/students/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.POST, "/api/modules/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.POST, "/api/batch-modules/**").hasRole("ADMIN")
+
+            // ADMIN + TRAINER
+            .requestMatchers(HttpMethod.POST, "/api/ai/**").hasAnyRole("ADMIN", "TRAINER")
+            .requestMatchers(HttpMethod.POST, "/api/reports/**").hasAnyRole("ADMIN", "TRAINER")
+            .requestMatchers(HttpMethod.GET, "/api/students/**").hasAnyRole("ADMIN", "TRAINER")
+            .requestMatchers(HttpMethod.GET, "/api/batches/**").hasAnyRole("ADMIN", "TRAINER")
+            .requestMatchers(HttpMethod.GET, "/api/modules/**").hasAnyRole("ADMIN", "TRAINER")
+            .requestMatchers(HttpMethod.GET, "/api/batch-modules/**").hasAnyRole("ADMIN", "TRAINER")
+            .requestMatchers(HttpMethod.POST, "/api/evaluations").hasAnyRole("ADMIN", "TRAINER")
+            .requestMatchers(HttpMethod.PUT, "/api/evaluations/**").hasAnyRole("ADMIN", "TRAINER")
+            .requestMatchers(HttpMethod.PUT, "/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.GET, "/api/evaluations/**").hasAnyRole("ADMIN", "TRAINER", "PLACEMENT")
+
+            // ADMIN + TRAINER + PLACEMENT
+            .requestMatchers(HttpMethod.GET, "/api/analytics/**").hasAnyRole("ADMIN", "TRAINER", "PLACEMENT")
+
             .anyRequest().authenticated()
         )
         .authenticationProvider(authenticationProvider())

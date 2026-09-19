@@ -11,49 +11,54 @@ import com.fbs.mock_evaluation_system.service.ForgotPasswordService;
 import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-	private final AuthService authService;
-	private final ForgotPasswordService forgotPasswordService;
+    private final AuthService authService;
+    private final ForgotPasswordService forgotPasswordService;
 
-	public AuthController(AuthService authService,
-	        ForgotPasswordService forgotPasswordService) {
-	    this.authService = authService;
-	    this.forgotPasswordService = forgotPasswordService;
-	}
+    public AuthController(AuthService authService,
+            ForgotPasswordService forgotPasswordService) {
+        this.authService = authService;
+        this.forgotPasswordService = forgotPasswordService;
+    }
 
-    // POST /auth/login
+    // POST /api/auth/login — password login for all roles
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(
             @Valid @RequestBody AuthRequestDTO request) {
-
-        AuthResponseDTO response = authService.login(request);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(authService.login(request));
     }
-    @GetMapping("/test-hash")
-    public String testHash() {
-        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-        return encoder.encode("Welcome@123");
+
+    // POST /api/auth/otp/send — TRAINER, PLACEMENT (OTP)
+    @PostMapping("/otp/send")
+    public ResponseEntity<Map<String, String>> sendOtp(
+            @RequestBody Map<String, String> body) {
+        String message = authService.sendOtp(body.get("email"));
+        return ResponseEntity.ok(Map.of("message", message));
     }
- // POST /auth/forgot-password
+
+    // POST /api/auth/otp/verify — verify OTP and get token
+    @PostMapping("/otp/verify")
+    public ResponseEntity<AuthResponseDTO> verifyOtp(
+            @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(
+            authService.verifyOtp(body.get("email"), body.get("otp")));
+    }
+
+    // POST /api/auth/forgot-password
     @PostMapping("/forgot-password")
-    public ResponseEntity<String> forgotPassword(
+    public ResponseEntity<Map<String, String>> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequestDTO request) {
-        String otp = forgotPasswordService.sendOtp(request);
-        return ResponseEntity.ok(otp);
+        return ResponseEntity.ok(Map.of("message", forgotPasswordService.sendOtp(request)));
     }
 
-    // POST /auth/verify-otp
+    // POST /api/auth/verify-otp
     @PostMapping("/verify-otp")
     public ResponseEntity<Boolean> verifyOtp(
             @Valid @RequestBody VerifyOtpRequestDTO request) {
@@ -61,7 +66,7 @@ public class AuthController {
         return ResponseEntity.ok(valid);
     }
 
-    // POST /auth/reset-password
+    // POST /api/auth/reset-password
     @PostMapping("/reset-password")
     public ResponseEntity<Void> resetPassword(
             @Valid @RequestBody ResetPasswordRequestDTO request) {

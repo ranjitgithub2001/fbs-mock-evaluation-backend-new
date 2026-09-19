@@ -23,7 +23,7 @@ import com.fbs.mock_evaluation_system.service.StudentService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/students")
+@RequestMapping("/api/students")
 public class StudentController {
 
     private final StudentService studentService;

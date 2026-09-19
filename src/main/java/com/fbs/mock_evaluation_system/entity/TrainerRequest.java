@@ -39,6 +39,23 @@ public class TrainerRequest {
     @Column
     private String rejectionReason;
 
+    // Shared attendance table requires these NOT NULL columns on insert.
+    @Column(name = "request_type", nullable = false)
+    private String requestType = "BATCH_ACCESS";
+
+    @Column(name = "trainer_id", nullable = false)
+    private Long trainerId = 0L;
+
+    @PrePersist
+    void fillSharedTableDefaults() {
+        if (requestType == null || requestType.isBlank()) {
+            requestType = "BATCH_ACCESS";
+        }
+        if (trainerId == null) {
+            trainerId = 0L;
+        }
+    }
+
     public TrainerRequest() {
     }
 
@@ -71,4 +88,10 @@ public class TrainerRequest {
 
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+
+    public String getRequestType() { return requestType; }
+    public void setRequestType(String requestType) { this.requestType = requestType; }
+
+    public Long getTrainerId() { return trainerId; }
+    public void setTrainerId(Long trainerId) { this.trainerId = trainerId; }
 }

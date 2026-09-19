@@ -20,7 +20,7 @@ import com.fbs.mock_evaluation_system.service.BatchModuleService;
 import java.util.List;
 
 @RestController
-@RequestMapping("/batch-modules")
+@RequestMapping("/api/batch-modules")
 public class BatchModuleController {
 
     private final BatchModuleService batchModuleService;

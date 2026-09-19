@@ -33,7 +33,7 @@ import jakarta.validation.Valid;
 // FIX #5 — removed duplicate import of java.util.List
 
 @RestController
-@RequestMapping("/evaluations")
+@RequestMapping("/api/evaluations")
 public class EvaluationController {
 
     private final EvaluationService evaluationService;
